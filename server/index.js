@@ -82,6 +82,29 @@ app.delete('/api/entries/:id', (req, res) => {
   }
 });
 
+// 导出交付：先预演，把条数、每语言情况与空译文摆到页面上，确认后再取压缩包
+app.post('/api/export/preview', (req, res) => {
+  try {
+    res.json(api.buildPreview(req.body));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+app.post('/api/export', (req, res) => {
+  try {
+    const result = api.buildExport(req.body);
+    const zip = api.zipFiles(result.files);
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="i18n-export-${stamp}.zip"`);
+    res.setHeader('X-Export-Total-Entries', String(result.totalEntries));
+    res.send(zip);
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
 // 未匹配到的接口路径统一返回说明，避免前端拿到一串页面内容
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: { code: 'API_NOT_FOUND', message: '接口不存在', field: '' } });

@@ -64,8 +64,48 @@
           <button type="button" id="filter-apply">筛选</button>
           <button type="button" id="filter-reset" class="ghost">重置</button>
           <button type="button" id="entry-refresh" class="ghost">刷新</button>
+          <button type="button" id="entry-export" class="ghost">导出文案</button>
           <button type="button" id="entry-new">新建文案</button>
         </div>
+      </div>
+
+      <div class="export-panel hidden" id="export-panel">
+        <div class="export-head">
+          <h3>导出文案</h3>
+          <span class="panel-tip">选好语言、模块与范围，先在页面上预演一遍，确认后再下载交付物</span>
+          <button type="button" id="export-close" class="ghost">收起</button>
+        </div>
+        <fieldset class="export-block" data-field="entryIds">
+          <legend>范围</legend>
+          <div class="export-radios">
+            <label class="radio"><input type="radio" name="export-scope" value="filter" checked> 把当前筛选出来的结果整体带走</label>
+            <label class="radio"><input type="radio" name="export-scope" value="entries"> 只带我勾选的几条文案</label>
+          </div>
+          <p class="export-hint" id="export-scope-hint"></p>
+        </fieldset>
+        <div class="export-grid">
+          <fieldset class="export-block" data-field="languageCodes">
+            <legend>要交付的语言</legend>
+            <div class="toolbar-line">
+              <button type="button" class="link" id="export-lang-all">全选</button>
+              <button type="button" class="link" id="export-lang-none">全不选</button>
+            </div>
+            <div class="check-list" id="export-languages"></div>
+          </fieldset>
+          <fieldset class="export-block" data-field="moduleNames">
+            <legend>要导出的模块</legend>
+            <div class="toolbar-line">
+              <button type="button" class="link" id="export-module-all">全选</button>
+              <button type="button" class="link" id="export-module-none">全不选</button>
+            </div>
+            <div class="check-list" id="export-modules"></div>
+          </fieldset>
+        </div>
+        <div class="export-actions">
+          <button type="button" id="export-preview-btn">生成交付预演</button>
+          <label class="check" data-field="includeEmpty"><input type="checkbox" id="export-include-empty"> 空译文一并带上</label>
+        </div>
+        <div class="export-result hidden" id="export-result"></div>
       </div>
       <div class="table-wrap">
         <table class="grid">

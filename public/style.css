@@ -376,3 +376,181 @@ label.full input {
   display: flex;
   gap: 10px;
 }
+
+/* ---------- 导出面板 ---------- */
+
+.export-panel {
+  margin-bottom: 14px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f9fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.export-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.export-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.export-head .panel-tip {
+  flex: 1;
+}
+
+.export-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.export-block {
+  flex: 1;
+  min-width: 260px;
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.export-block legend {
+  padding: 0 6px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.export-block.invalid {
+  border-color: var(--danger);
+  background: #fdf3f3;
+}
+
+.export-block.invalid legend {
+  color: var(--danger);
+}
+
+.export-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+label.radio {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+label.radio input {
+  width: auto;
+}
+
+.export-hint {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.toolbar-line {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+label.check-item {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+label.check-item input {
+  width: auto;
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.export-result {
+  padding: 12px 14px;
+  border: 1px solid #b7ddc9;
+  border-radius: 6px;
+  background: #f4faf6;
+}
+
+.export-result h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.export-summary {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.export-lang-stats {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.empty-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.export-ok {
+  color: var(--ok);
+  font-size: 12px;
+}
+
+.export-warn {
+  color: #b26a00;
+  font-size: 12px;
+}
+
+.export-note {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: var(--warn-bg);
+  color: #8a5a00;
+  font-size: 12px;
+}
+
+.pick-col {
+  width: 34px;
+  text-align: center;
+}

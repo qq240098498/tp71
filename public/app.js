@@ -5,6 +5,8 @@ const state = {
   entries: [],
   modules: [],
   editingId: '',
+  // 勾选要导出的文案 ID，可以跨筛选累计；导出时由服务端按所选模块再校一遍
+  pickedIds: new Set(),
 };
 
 const el = (id) => document.getElementById(id);
@@ -172,12 +174,24 @@ function collectTranslations() {
   return result;
 }
 
+// 勾选列：全选框只作用于当前筛选结果里的文案
+function syncPickAll() {
+  const pickAll = el('entry-pick-all');
+  if (!pickAll) return;
+  const visibleIds = state.entries.map((item) => item.id);
+  const chosen = visibleIds.filter((id) => state.pickedIds.has(id));
+  pickAll.checked = visibleIds.length > 0 && chosen.length === visibleIds.length;
+  pickAll.indeterminate = chosen.length > 0 && chosen.length < visibleIds.length;
+}
+
 function renderEntries() {
   const head = el('entry-head-row');
-  head.innerHTML = ['模块', '文案键']
+  const pickAll = '<th class="pick-col"><input type="checkbox" id="entry-pick-all" title="全选当前筛选结果"></th>';
+  head.innerHTML = [pickAll]
+    .concat(['模块', '文案键'])
     .concat(state.languages.map((item) => item.code))
     .concat(['备注', '最近改动人', '更新时间', '操作'])
-    .map((text) => `<th>${escapeHtml(text)}</th>`)
+    .map((text, index) => (index === 0 ? text : `<th>${escapeHtml(text)}</th>`))
     .join('');
 
   const body = el('entry-body');
@@ -189,6 +203,7 @@ function renderEntries() {
       return `<td title="${escapeHtml(value)}">${escapeHtml(value)}</td>`;
     });
     return `<tr>
+      <td class="pick-col"><input type="checkbox" class="entry-pick" data-entry-id="${escapeHtml(item.id)}"${state.pickedIds.has(item.id) ? ' checked' : ''}></td>
       <td class="mono">${escapeHtml(item.module)}</td>
       <td class="mono">${escapeHtml(item.key)}</td>
       ${cells.join('')}
@@ -202,6 +217,7 @@ function renderEntries() {
     </tr>`;
   }).join('');
   el('entry-empty').classList.toggle('hidden', state.entries.length > 0);
+  syncPickAll();
 }
 
 function openEntryForm(entry) {
@@ -325,6 +341,7 @@ document.addEventListener('click', async (event) => {
     try {
       await request(`/api/entries/${encodeURIComponent(node.dataset.entryDelete)}`, { method: 'DELETE' });
       if (state.editingId === node.dataset.entryDelete) closeEntryForm();
+      state.pickedIds.delete(node.dataset.entryDelete);
       notify('文案已删除', 'ok');
       await loadEntries();
       await loadLanguages();
@@ -359,6 +376,218 @@ el('entry-refresh').addEventListener('click', () => {
 el('filter-module').addEventListener('change', () => {
   loadEntries().catch((err) => notify(err.message, 'error'));
 });
+
+// ===== 导出交付 =====
+
+function showExportError(message) {
+  const box = el('export-error');
+  box.textContent = message;
+  box.classList.remove('hidden');
+}
+
+function clearExportError() {
+  const box = el('export-error');
+  box.textContent = '';
+  box.classList.add('hidden');
+  el('export-modal').querySelectorAll('.invalid').forEach((node) => node.classList.remove('invalid'));
+}
+
+// 把服务端指出的出错位置标到弹窗里对应的范围分组上
+function markExportField(field) {
+  if (!field) return;
+  const name = field === 'entryIds' ? 'scope' : field.split('.')[0];
+  const target = el('export-modal').querySelector(`[data-field="${name}"]`);
+  if (target) target.classList.add('invalid');
+}
+
+function checkedModules() {
+  return Array.from(el('export-modules').querySelectorAll('input:checked')).map((input) => input.value);
+}
+
+function checkedLanguages() {
+  const picked = new Set(Array.from(el('export-languages').querySelectorAll('input:checked')).map((input) => input.value));
+  return state.languages.map((item) => item.code).filter((code) => picked.has(code));
+}
+
+// 勾选条数是全局累计的，直接显示；整体范围以服务端按所选模块＋关键词算出的为准，这里只说明口径
+function updateScopeHint() {
+  const keyword = el('filter-keyword').value.trim();
+  const wordText = keyword ? `匹配关键词「${keyword}」的` : '全部';
+  el('export-scope-hint').textContent = `「整体带走」＝所选模块下${wordText}文案；勾选模式只带走你打勾的条目，当前已累计勾选 ${state.pickedIds.size} 条（可跨筛选累计）。`;
+  el('export-picked-count').textContent = String(state.pickedIds.size);
+}
+
+// 每次打开都按当前数据重建勾选项：已启用的语言默认勾上，模块默认全选
+function openExportModal() {
+  clearNotice();
+  clearExportError();
+  el('export-languages').innerHTML = state.languages.map((item) => {
+    const suffix = item.enabled ? '' : '<span class="tag off">已停用</span>';
+    return `<label class="check"><input type="checkbox" value="${escapeHtml(item.code)}"${item.enabled ? ' checked' : ''}>
+      <span class="mono">${escapeHtml(item.code)}</span> ${escapeHtml(item.name)} ${suffix}</label>`;
+  }).join('');
+  // 页面上已经按某个模块筛选时，默认只勾这个模块，让「整体带走」与当前列表对齐；否则全选
+  const activeModule = el('filter-module').value;
+  el('export-modules').innerHTML = state.modules.map((item) => {
+    const checked = !activeModule || item.module === activeModule ? ' checked' : '';
+    return `<label class="check"><input type="checkbox" value="${escapeHtml(item.module)}"${checked}>
+      <span class="mono">${escapeHtml(item.module)}</span>（${item.count}）</label>`;
+  }).join('');
+  const scopeAll = el('export-modal').querySelector('input[name="export-scope"][value="all"]');
+  scopeAll.checked = true;
+  el('export-include-empty').checked = false;
+  el('export-preview').classList.add('hidden');
+  el('export-actions').classList.add('hidden');
+  el('export-form').classList.remove('hidden');
+  setScopeFieldsDisabled(false);
+  updateScopeHint();
+  el('export-modal').classList.remove('hidden');
+}
+
+function closeExportModal() {
+  el('export-modal').classList.add('hidden');
+  clearExportError();
+}
+
+function setScopeFieldsDisabled(disabled) {
+  el('export-languages').querySelectorAll('input').forEach((input) => { input.disabled = disabled; });
+  el('export-modules').querySelectorAll('input').forEach((input) => { input.disabled = disabled; });
+  el('export-modal').querySelectorAll('input[name="export-scope"]').forEach((input) => { input.disabled = disabled; });
+}
+
+// 收集这次导出的范围；预演与确认下载共用同一份口径
+function collectExportPayload() {
+  const payload = {
+    languages: checkedLanguages(),
+    modules: checkedModules(),
+    includeEmpty: el('export-include-empty').checked,
+  };
+  const picked = el('export-modal').querySelector('input[name="export-scope"]:checked').value === 'picked';
+  if (picked) {
+    payload.entryIds = Array.from(state.pickedIds);
+  } else {
+    const keyword = el('filter-keyword').value.trim();
+    if (keyword) payload.keyword = keyword;
+  }
+  return payload;
+}
+
+async function runExportPreview(event) {
+  event.preventDefault();
+  clearExportError();
+  const payload = collectExportPayload();
+  try {
+    const preview = await request('/api/exports/preview', { method: 'POST', body: JSON.stringify(payload) });
+    state.exportPayload = payload;
+    renderExportPreview(preview);
+  } catch (err) {
+    showExportError(err.message);
+    markExportField(err.field);
+  }
+}
+
+function renderExportPreview(preview) {
+  const languageRows = preview.languages.map((item) => {
+    const suffix = item.enabled ? '' : ' <span class="tag off">已停用</span>';
+    return `<tr>
+      <td><span class="mono">${escapeHtml(item.code)}</span> ${escapeHtml(item.name)}${suffix}</td>
+      <td>${item.filled} 条</td>
+      <td class="${item.blank > 0 ? 'missing' : ''}">${item.blank} 条</td>
+    </tr>`;
+  }).join('');
+
+  let blankBlock;
+  if (!preview.blankCount) {
+    blankBlock = '<p class="export-ok">所选语言下这一批文案都已填好，没有空缺。</p>';
+  } else {
+    const limit = 50;
+    const rows = preview.blankRows.slice(0, limit).map((row) =>
+      `<li><span class="mono">${escapeHtml(row.key)}</span> 在 <span class="mono">${escapeHtml(row.language)}</span> 下为空</li>`).join('');
+    const more = preview.blankCount > limit ? `<p class="panel-tip">其余 ${preview.blankCount - limit} 条空缺没有列全，下载文件里可以逐条核对。</p>` : '';
+    blankBlock = `<div class="blank-list">
+      <h4>空译文清单（${preview.blankCount} 个格子）</h4>
+      <ul>${rows}</ul>${more}
+    </div>`;
+  }
+
+  el('export-preview').innerHTML = `
+    <h3>交付预演</h3>
+    <p class="export-summary">共 <strong>${preview.totalEntries}</strong> 条文案，模块：${preview.modules.map(escapeHtml).join('、')}；空译文格子共 <strong>${preview.blankCount}</strong> 个。</p>
+    <div class="table-wrap">
+      <table class="grid">
+        <thead><tr><th>语言</th><th>已填译文</th><th>空缺</th></tr></thead>
+        <tbody>${languageRows}</tbody>
+      </table>
+    </div>
+    ${blankBlock}
+    <p class="panel-tip">空译文是否一并带上，由下方的勾选项决定；改完直接点下载即可，不用重新预演。</p>`;
+  el('export-preview').classList.remove('hidden');
+  el('export-actions').classList.remove('hidden');
+  setScopeFieldsDisabled(true);
+}
+
+async function confirmExportDownload() {
+  clearExportError();
+  if (!state.exportPayload) return;
+  const payload = { ...state.exportPayload, includeEmpty: el('export-include-empty').checked };
+  try {
+    const result = await request('/api/exports', { method: 'POST', body: JSON.stringify(payload) });
+    const blob = new Blob([JSON.stringify(result.content, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = result.fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    notify(`已导出 ${result.totalEntries} 条文案：${result.fileName}`, 'ok');
+    closeExportModal();
+  } catch (err) {
+    showExportError(err.message);
+    markExportField(err.field);
+  }
+}
+
+el('export-open').addEventListener('click', openExportModal);
+el('export-close').addEventListener('click', closeExportModal);
+el('export-cancel').addEventListener('click', closeExportModal);
+el('export-form').addEventListener('submit', runExportPreview);
+el('export-download').addEventListener('click', confirmExportDownload);
+el('export-rerun').addEventListener('click', () => {
+  clearExportError();
+  el('export-preview').classList.add('hidden');
+  el('export-actions').classList.add('hidden');
+  setScopeFieldsDisabled(false);
+  state.exportPayload = null;
+});
+el('export-modules').addEventListener('change', updateScopeHint);
+el('filter-keyword').addEventListener('input', updateScopeHint);
+el('export-modal').addEventListener('click', (event) => {
+  if (event.target === el('export-modal')) closeExportModal();
+});
+
+// 勾选列与弹窗复选框都靠事件委托，列表重绘后不用重新绑定
+document.addEventListener('change', (event) => {
+  const input = event.target;
+  if (input.id === 'entry-pick-all') {
+    state.entries.forEach((item) => {
+      if (input.checked) state.pickedIds.add(item.id);
+      else state.pickedIds.delete(item.id);
+    });
+    renderEntries();
+    updateScopeHint();
+    return;
+  }
+  if (input.classList.contains('entry-pick')) {
+    const id = input.dataset.entryId;
+    if (input.checked) state.pickedIds.add(id);
+    else state.pickedIds.delete(id);
+    syncPickAll();
+    updateScopeHint();
+  }
+});
+
 el('operator').addEventListener('change', () => {
   window.localStorage.setItem(OPERATOR_KEY, currentOperator());
 });

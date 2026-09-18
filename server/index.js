@@ -82,6 +82,23 @@ app.delete('/api/entries/:id', (req, res) => {
   }
 });
 
+// 导出交付：先预演（条数、每语言空缺），确认后再取可下载的交付 JSON
+app.post('/api/exports/preview', (req, res) => {
+  try {
+    res.json(api.previewExport(req.body));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+app.post('/api/exports', (req, res) => {
+  try {
+    res.json(api.confirmExport(req.body));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
 // 未匹配到的接口路径统一返回说明，避免前端拿到一串页面内容
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: { code: 'API_NOT_FOUND', message: '接口不存在', field: '' } });
